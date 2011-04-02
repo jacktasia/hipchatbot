@@ -1,53 +1,56 @@
-<?
-
-//TODO event loop that always checks which functions are registered...
-// loops through $history var checking for registered keywords to call func with...
-
-// :$keyword $arg // user defined keyword
-// :: $arg //built-in global...so ":: weather" would give you weather
-// or maybe just :bot weather
-
+<?php
 
 class HipChatBot {
 
+	const SLEEP_TIME = 15;
+	const TIMEZONE = 'PST';
 	const BASE_API_URL = 'https://api.hipchat.com';
 	const API_VERSION = 'v1';
 
 	protected $api_key;
 	protected $room_id;
+	protected $server_on = true;
 	protected $new_history;
 	protected $seen_history = array();
-
-	// protected $registered_keywords
+	protected $registered_funcs = array();
+	protected $hit_count = 0;
 
 	public function __construct($api_key,$room_id) {
 		$this->api_key = $api_key;
 		$this->room_id = $room_id;;
-
-		//echo print_r($this->_check_history('asdf'));
-
-		// register the default ::weather function...
 		$this->_update_history();
-		$this->parse_history('bot', function($args) {
-			if ( array_shift($args) == 'weather' ) {
-				return 'yes';
+	}
+
+	public function run() {
+		while ( $this->server_on ) {
+			$this->_update_history();
+			foreach ( $this->registered_funcs as $f ) {
+				$this->parse_history($f['keyword'],$f['display_name'],$f['func']);
 			}
-			return 'no';
-		});
+			self::debug("sleeping for " . self::SLEEP_TIME . '...HITS: ' . ++$this->hit_count);
+			sleep(self::SLEEP_TIME);
+		}
 	}
 
-	public function register_command($keyword,$display_name,$method) {
-		// store the this info in array...
+	public function register_func($keyword,$display_name,$func) {
+		$arr = array('keyword' => $keyword,
+					 'display_name' => $display_name,
+					 'func' => $func);
+		$this->registered_funcs[] = $arr;
 	}
 
-	public function parse_history($keyword,$func) { // look for keyword and args
+	public function parse_history($keyword,$display_name,$func) { // look for keyword and args
 		$pattern = '/\:' . $keyword . '(.+)$/';
 		foreach ( $this->new_history as $h ) {
 
 			preg_match_all($pattern,$h['message'],$matches);
 			foreach ( $matches[1] as $match ) {
 				$args = explode(' ',trim($match));
-				echo 'DOES THIS WORK?: ' . call_user_func($func,$args);
+				if ( !is_array($args) ) {
+					$args = array($args);
+				}
+				$response = $func($args);
+				$this->_send_message($response, $display_name);
 			}
 		}
 	}
@@ -56,44 +59,58 @@ class HipChatBot {
 		$history = $this->_get_history();
 		$history = $history['messages'];
 		$this->new_history = array();
+		$count = 0;
 		foreach ( $history as $h ) {
-			if ( !in_array($h,$this->seen_history) ) {
+			if ( !in_array($h,$this->seen_history,true) ) {
 				$this->new_history[] = $h;
+				$count++;
 			}
 		}
+		self::debug('new items:' . $count);
 		$this->seen_history = $history;
 	}
 
+	public function generate_url($type,$params=null) {
+		$url = self::BASE_API_URL . '/' . self::API_VERSION;
+		$url .= '/rooms/' . $type . '?';
+		$core_params = array('room_id' => $this->room_id,
+							'auth_token' =>  $this->api_key,
+							'timezone' => self::TIMEZONE);
+		if ( is_array($params) ) {
+			$core_params = array_merge($core_params,$params);
+		}
+		return $url . http_build_query($core_params);
+	}
+
 	protected function _get_history() {
-		$request = self::BASE_API_URL . '/' . self::API_VERSION . '/rooms/history?room_id=' . $this->room_id  . '&date=recent&timezone=PST&format=json&auth_token=' . $this->api_key;
-
-		echo "\n" . $request . "\n";
-		$curl = curl_init();
-		curl_setopt($curl, CURLOPT_URL, $request);
-		curl_setopt($curl, CURLOPT_RETURNTRANSFER, true);
-		curl_setopt($curl, CURLOPT_FOLLOWLOCATION, true);
-		$r = curl_exec($curl);
-		self::d($r);
-		curl_close($curl);
-
-		$data = json_decode($r,true);
+		$request = $this->generate_url('history',array('date'=>'recent'));
+		$response = self::_curl($request);
+		$data = json_decode($response,true);
 		return $data;
 	}
 
-	public static function d($s) {
+	public function _send_message($message,$from) {
+		$params = array('message'=>$message,
+						'from' => $from);
+		$params['message'] = str_replace(array('<BR />','<br/>','<BR/>'),
+										array('<br />','<br />','<br />'),$params['message']);
+		self::debug("SENDING MESSAGE:\n\n" . $params['message']);
+		$request = $this->generate_url('message',$params);
+		self::_curl($request);
+	}
+
+	public static function _curl($url) {
+		$curl = curl_init();
+		curl_setopt($curl, CURLOPT_URL, $url);
+		curl_setopt($curl, CURLOPT_RETURNTRANSFER, true);
+		curl_setopt($curl, CURLOPT_FOLLOWLOCATION, true);
+		$response = curl_exec($curl);
+		curl_close($curl);
+		return $response;
+	}
+
+	public static function debug($s) {
 		echo "\n\n{$s}\n\n";
 	}
 
 }
-
-$hcb = new HipChatBot('92b4cb825cef189def9a7b91b55a79','16110');
-
-//$hcb->register_bot()
-
-// $hcb->run(); // goes into event loop
-
-// $arg should/can be an of the explode(' ') after keyword...
-/* function ($arg) { */
-/* 	// do stuff with $arg.. */
-	// return what should be printed...
-/* } */
