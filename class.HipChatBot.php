@@ -12,7 +12,7 @@ class HipChatBot {
 	protected $server_on = true;
 	protected $new_history;
 	protected $seen_history = array();
-	protected $registered_funcs = array();
+	protected $registered_bots = array();
 	protected $hit_count = 0;
 
 	public function __construct($api_key,$room_id) {
@@ -24,7 +24,7 @@ class HipChatBot {
 	public function run() {
 		while ( $this->server_on ) {
 			$this->_update_history();
-			foreach ( $this->registered_funcs as $f ) {
+			foreach ( $this->registered_bots as $f ) {
 				$this->parse_history($f['keyword'],$f['display_name'],$f['func']);
 			}
 			self::debug("sleeping for " . self::SLEEP_TIME . '...HITS: ' . ++$this->hit_count);
@@ -32,15 +32,15 @@ class HipChatBot {
 		}
 	}
 
-	public function register_func($keyword,$display_name,$func) {
+	public function register_bot($keyword,$display_name,$func) {
 		$arr = array('keyword' => $keyword,
 					 'display_name' => $display_name,
 					 'func' => $func);
-		$this->registered_funcs[] = $arr;
+		$this->registered_bots[] = $arr;
 	}
 
 	public function parse_history($keyword,$display_name,$func) { // look for keyword and args
-		$pattern = '/\:' . $keyword . '(.+)$/';
+		$pattern = '/\:' . $keyword . '(.*)$/';
 		foreach ( $this->new_history as $h ) {
 
 			preg_match_all($pattern,$h['message'],$matches);
