@@ -19,6 +19,10 @@ class HipChatBot {
 		$this->api_key = $api_key;
 		$this->room_id = $room_id;;
 		$this->_update_history();
+		$this->register_bot('kill-bot','Killer', function($args) {
+			HipChatBot::debug('Got killed.');
+			die("\nBye.\n");
+		});
 	}
 
 	public function run() {
@@ -27,7 +31,7 @@ class HipChatBot {
 			foreach ( $this->registered_bots as $f ) {
 				$this->parse_history($f['keyword'],$f['display_name'],$f['func']);
 			}
-			self::debug("sleeping for " . self::SLEEP_TIME . '...HITS: ' . ++$this->hit_count);
+			self::debug("sleeping for " . self::SLEEP_TIME . ' seconds | server hits: ' . ++$this->hit_count);
 			sleep(self::SLEEP_TIME);
 		}
 	}
@@ -39,7 +43,7 @@ class HipChatBot {
 		$this->registered_bots[] = $arr;
 	}
 
-	public function parse_history($keyword,$display_name,$func) { // look for keyword and args
+	public function parse_history($keyword,$display_name,$func) {
 		$pattern = '/\:' . $keyword . '(.*)$/';
 		foreach ( $this->new_history as $h ) {
 
@@ -66,7 +70,7 @@ class HipChatBot {
 				$count++;
 			}
 		}
-		self::debug('new items:' . $count);
+		self::debug('updated, new items:' . $count);
 		$this->seen_history = $history;
 	}
 
@@ -90,11 +94,11 @@ class HipChatBot {
 	}
 
 	public function _send_message($message,$from) {
-		$params = array('message'=>$message,
+		$params = array('message'=> $message,
 						'from' => $from);
 		$params['message'] = str_replace(array('<BR />','<br/>','<BR/>'),
 										array('<br />','<br />','<br />'),$params['message']);
-		self::debug("SENDING MESSAGE:\n\n" . $params['message']);
+		self::debug("Sent Message:\n\t\t" . $params['message']);
 		$request = $this->generate_url('message',$params);
 		self::_curl($request);
 	}
@@ -110,7 +114,7 @@ class HipChatBot {
 	}
 
 	public static function debug($s) {
-		echo "\n\n{$s}\n\n";
+		echo "\n" . date('Y-m-d h:m:s') . " => {$s}\n";
 	}
 
 }
