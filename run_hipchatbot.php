@@ -6,7 +6,6 @@ require(dirname(__FILE__) . '/class.HipChatBot.php');
 $hcb = new HipChatBot('92b4cb825cef189def9a7b91b55a79','16110');
 
 /* 
-
 register some simple bots:  
  	1) call bot name  
  	2) bot display name  
@@ -16,8 +15,8 @@ register some simple bots:
 */
 
 // simple bot that can return weather and emoticon info..
-//   example typing ":bot weather" will return weather info from yahoo api 
-$hcb->register_bot('bot', 'Bot', function($args) {
+//  example typing ":bot weather" will return weather info from yahoo api 
+$hcb->register_name_bot('bot', 'Bot', function($args) {
 
 	$weather_url = 'http://query.yahooapis.com/v1/public/yql?format=json&q=select%20*%20from%20weather.forecast%20where%20location=94111';
 	$emoticons = array('(hipchat)','(beer)','(coffee)','(poo)','(heart)',
@@ -44,12 +43,19 @@ $hcb->register_bot('bot', 'Bot', function($args) {
 });
 
 // very simple bot will return back the first argument or 'nothing given'
-$hcb->register_bot('rms', 'RMS', function($args) {
+$hcb->register_name_bot('rms', 'RMS', function($args) {
 	if ( isset($args[0]) && strlen($args[0]) ) {
 		return 'you said "' . $args[0] . '"';
 	}
 	return 'nothing given';
 });
+
+// "see bot" looks for a certain string in a message and then does func if finds it...
+$hcb->register_needle_bot('emacs', 'Jack', function($args) {
+	return 'yes! emacs was mentioned';
+});
+
+
 
 // start the bot up...
 $hcb->run();

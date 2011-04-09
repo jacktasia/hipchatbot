@@ -2,7 +2,7 @@
 
 class HipChatBot {
 
-	const SLEEP_TIME = 15;
+	const SLEEP_TIME = 12;
 	const TIMEZONE = 'PST';
 	const BASE_API_URL = 'https://api.hipchat.com';
 	const API_VERSION = 'v1';
@@ -13,13 +13,14 @@ class HipChatBot {
 	protected $new_history;
 	protected $seen_history = array();
 	protected $registered_bots = array();
+	protected $registered_needles = array();
 	protected $hit_count = 0;
 
 	public function __construct($api_key,$room_id) {
 		$this->api_key = $api_key;
 		$this->room_id = $room_id;;
 		$this->_update_history();
-		$this->register_bot('kill-bot','Killer', function($args) {
+		$this->register_name_bot('kill-bot','Killer', function($args) {
 			HipChatBot::debug('Got killed.');
 			die("\nBye.\n");
 		});
@@ -29,22 +30,33 @@ class HipChatBot {
 		while ( $this->server_on ) {
 			$this->_update_history();
 			foreach ( $this->registered_bots as $f ) {
-				$this->parse_history($f['keyword'],$f['display_name'],$f['func']);
+				$this->parse_history($f['pattern'],$f['display_name'],$f['func']);
 			}
 			self::debug("sleeping for " . self::SLEEP_TIME . ' seconds | server hits: ' . ++$this->hit_count);
 			sleep(self::SLEEP_TIME);
 		}
 	}
 
-	public function register_bot($keyword,$display_name,$func) {
-		$arr = array('keyword' => $keyword,
+	public function register_needle_bot($needle,$display_name,$func) {
+		$this->registered_needles[] = $needle;
+		$pattern = '/(' . $needle . ')/';
+		$this->_base_register_bot($pattern,$display_name,$func);
+	}
+
+	public function register_name_bot($name,$display_name,$func) {
+		$pattern = '/\:' . $name . '(.*)$/';
+		$this->_base_register_bot($pattern,$display_name,$func);
+	}
+
+	public function _base_register_bot($pattern,$display_name,$func) {
+		$arr = array('pattern' => $pattern,
 					 'display_name' => $display_name,
 					 'func' => $func);
 		$this->registered_bots[] = $arr;
 	}
 
-	public function parse_history($keyword,$display_name,$func) {
-		$pattern = '/\:' . $keyword . '(.*)$/';
+	public function parse_history($pattern,$display_name,$func) {
+
 		foreach ( $this->new_history as $h ) {
 
 			preg_match_all($pattern,$h['message'],$matches);
@@ -93,7 +105,19 @@ class HipChatBot {
 		return $data;
 	}
 
+	public static function clean_message($message,$needle) {
+		$needle_array = str_split($needle);
+		$new_needle = '';
+		foreach ( $needle_array as $n ) {
+			$new_needle .= $n . ' ';
+		}
+		return str_replace($needle,$new_needle,$message);
+	}
+
 	public function _send_message($message,$from) {
+		foreach ( $this->registered_needles as $needle ) {
+			$message = self::clean_message($message,$needle);
+		}
 		$params = array('message'=> $message,
 						'from' => $from);
 		$params['message'] = str_replace(array('<BR />','<br/>','<BR/>'),
@@ -114,7 +138,7 @@ class HipChatBot {
 	}
 
 	public static function debug($s) {
-		echo "\n" . date('Y-m-d h:m:s') . " => {$s}\n";
+		echo "\n" . date('Y-m-d h:i:s') . " => {$s}\n";
 	}
 
 }
